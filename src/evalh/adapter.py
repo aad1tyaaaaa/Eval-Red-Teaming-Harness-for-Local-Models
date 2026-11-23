@@ -17,7 +17,7 @@ async def chat(client: httpx.AsyncClient, m: ModelCfg, messages: list[dict], s: 
         **extra,
     }
     out = {"text": "", "ttft_s": None, "total_s": None, "n_chunks": 0, "usage": None,
-           "finish_reason": None, "error": None}
+           "finish_reason": None, "error": None, "t_start": time.time(), "t_end": None}
     t0 = time.perf_counter()
     try:
         async with client.stream("POST", f"{m.base_url.rstrip('/')}/chat/completions", json=body,
@@ -45,4 +45,5 @@ async def chat(client: httpx.AsyncClient, m: ModelCfg, messages: list[dict], s: 
     except (httpx.HTTPError, json.JSONDecodeError) as e:
         out["error"] = f"{type(e).__name__}: {e}"
     out["total_s"] = time.perf_counter() - t0
+    out["t_end"] = time.time()
     return out

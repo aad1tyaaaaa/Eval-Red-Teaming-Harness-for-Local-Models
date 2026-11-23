@@ -11,12 +11,25 @@ import httpx
 
 from .adapter import chat
 from .config import Config
+from .latency import GpuSampler
+
+FILLER = ("The archive held ledgers of grain shipments, weather notes, tide tables and letters between "
+          "harbour masters, each page catalogued by date, port and the clerk who copied it. ").split()
 
 
 def load_cases(cfg: Config, suite: str) -> list[dict]:
     # ponytail: one file per suite for now; multi-file suites (adversarial/*.jsonl) come with M4
     path = cfg.suites_dir / suite / "prompts.jsonl"
     return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
+def messages(case: dict) -> list[dict]:
+    if case.get("messages"):
+        return case["messages"]
+    prompt = case["prompt"]
+    if n := case.get("filler_words"):  # deterministic padding for long-prompt (prefill) buckets
+        prompt = " ".join(FILLER[i % len(FILLER)] for i in range(n)) + "\n\n" + prompt
+    return [{"role": "user", "content": prompt}]
 
 
 def fingerprint(cfg: Config) -> dict:
@@ -39,21 +52,34 @@ async def run(cfg: Config, out_root: Path = Path("runs"), client: httpx.AsyncCli
     run_dir.mkdir(parents=True)
     (run_dir / "meta.json").write_text(json.dumps(fingerprint(cfg), indent=2), encoding="utf-8")
     client = client or httpx.AsyncClient()
-    sem = asyncio.Semaphore(cfg.concurrency)
 
     with (run_dir / "traces.jsonl").open("w", encoding="utf-8") as f:
+        def write(rec):
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            f.flush()
+
         for key, m in cfg.models.items():  # A fully, then B: never interleave on one GPU
-            for _ in range(cfg.warmup):
-                await chat(client, m, [{"role": "user", "content": "Hello"}], cfg.sampling, cfg.seed)
+            with GpuSampler() as gpu:
+                for _ in range(cfg.warmup):
+                    await chat(client, m, [{"role": "user", "content": "Hello"}], cfg.sampling, cfg.seed)
 
-            async def one(suite, case, rep):
-                msgs = case.get("messages") or [{"role": "user", "content": case["prompt"]}]
-                async with sem:
-                    res = await chat(client, m, msgs, cfg.sampling, cfg.seed)
-                f.write(json.dumps({"model_key": key, "model": m.model, "suite": suite, "case_id": case["id"],
-                                    "repeat": rep, "messages": msgs, **res}, ensure_ascii=False) + "\n")
-                f.flush()
+                sem = asyncio.Semaphore(cfg.concurrency)
 
-            await asyncio.gather(*(one(s, c, r) for s in cfg.suites for c in load_cases(cfg, s)
-                                   for r in range(cfg.repeats)))
+                async def one(suite, case, rep, sem=sem, **tags):
+                    msgs = messages(case)
+                    async with sem:
+                        res = await chat(client, m, msgs, cfg.sampling, cfg.seed)
+                    write({"model_key": key, "model": m.model, "suite": suite, "case_id": case["id"],
+                           "repeat": rep, "case": case, "messages": msgs, **tags, **res})
+
+                await asyncio.gather(*(one(s, c, r) for s in cfg.suites for c in load_cases(cfg, s)
+                                       for r in range(cfg.repeats)))
+
+                if cfg.concurrency_sweep and "latency" in cfg.suites:
+                    case = load_cases(cfg, "latency")[0]
+                    for n in cfg.concurrency_sweep:
+                        # ponytail: fixed 2 rounds per level; make configurable if CIs on throughput are too wide
+                        level = asyncio.Semaphore(n)
+                        await asyncio.gather(*(one("sweep", case, r, sem=level, concurrency=n) for r in range(2 * n)))
+            write({"model_key": key, "model": m.model, "suite": "system", **gpu.summary()})
     return run_dir

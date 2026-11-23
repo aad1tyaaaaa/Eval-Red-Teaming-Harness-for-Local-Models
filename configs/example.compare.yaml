@@ -3,6 +3,7 @@ seed: 42
 repeats: 3
 concurrency: 1
 warmup: 3
+concurrency_sweep: [1, 2, 4, 8]
 
 models:
   A:

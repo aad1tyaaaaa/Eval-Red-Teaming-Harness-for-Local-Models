@@ -23,6 +23,7 @@ class Config(BaseModel):
     repeats: int = 3
     concurrency: int = 1
     warmup: int = 3
+    concurrency_sweep: list[int] = []  # e.g. [1, 2, 4, 8]; empty = skip
     models: dict[str, ModelCfg]
     sampling: Sampling = Sampling()
     judge: ModelCfg | None = None
