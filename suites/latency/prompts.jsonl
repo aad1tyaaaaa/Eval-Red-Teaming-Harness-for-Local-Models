@@ -1,0 +1,4 @@
+{"id": "short-1", "bucket": "short", "prompt": "Name three primary colors."}
+{"id": "short-2", "bucket": "short", "prompt": "What is the capital of Japan? Answer in one word."}
+{"id": "medium-1", "bucket": "medium", "prompt": "Explain how a hash map works, including collision handling, resizing, and typical time complexity. Use about 200 words."}
+{"id": "medium-2", "bucket": "medium", "prompt": "Write a short story (about 150 words) about a lighthouse keeper who discovers the light has been guiding something other than ships."}
