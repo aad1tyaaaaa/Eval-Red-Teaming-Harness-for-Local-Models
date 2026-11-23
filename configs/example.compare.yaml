@@ -1,0 +1,24 @@
+run_name: llama3.1-8b-q4-vs-q8
+seed: 42
+repeats: 3
+concurrency: 1
+warmup: 3
+
+models:
+  A:
+    base_url: http://localhost:11434/v1
+    model: llama3.1:8b-instruct-q4_K_M
+  B:
+    base_url: http://localhost:11434/v1
+    model: llama3.1:8b-instruct-q8_0
+
+sampling:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 512
+
+judge:
+  base_url: http://localhost:8080/v1
+  model: qwen2.5-14b-instruct
+
+suites: [latency]
