@@ -21,3 +21,11 @@ Each phase ships as its own branch + PR into `main`.
 | M4 Adversarial | `phase/m4-adversarial` | Seeds + mutators, canary detection, refusal classifier, ASR vs over-refusal |
 | M5 Stats & verdict | `phase/m5-stats` | Bootstrap CIs, McNemar/Wilcoxon, flip analysis, thresholds |
 | M6 Polish | `phase/m6-polish` | Judge κ, docs, Dockerfile, CI |
+
+## Commands
+
+```bash
+evalh run -c <config>          # run suites, write traces, build report
+evalh score runs/<dir>         # recompute metrics.json from traces (no model calls)
+evalh report runs/<dir> --open # rebuild report.html
+```

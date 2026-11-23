@@ -31,7 +31,7 @@ def test_run_writes_traces(tmp_path):
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     run_dir = asyncio.run(runner.run(cfg(tmp_path), tmp_path / "runs", client))
-    traces = [json.loads(l) for l in (run_dir / "traces.jsonl").read_text().splitlines()]
+    traces = [t for l in (run_dir / "traces.jsonl").read_text().splitlines() if (t := json.loads(l))["suite"] == "latency"]
 
     assert len(traces) == 2 * 2 * 2  # models x cases x repeats
     assert len(seen) == len(traces) + 2  # + 1 warmup per model
